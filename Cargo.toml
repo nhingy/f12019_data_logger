@@ -1,0 +1,10 @@
+[package]
+name = "f12019_data_logger"
+version = "0.1.0"
+authors = ["nhingy <jonpotter262@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byte = "0.2.4"
