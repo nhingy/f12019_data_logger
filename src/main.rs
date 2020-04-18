@@ -2,47 +2,40 @@
 use std::net::UdpSocket;
 use byte::*;
 
-const BUFFER_SIZE: usize = 1347;						//Max packet size to spec
-const DEFAULT_SOCKET_BINDING: &str = "0.0.0.0:20777";	//20777 default on ps4
-
-//Header part offsets
-const PACKET_FORMAT_OFFSET: usize = 0;
-const MAJ_VERSION_OFFSET: usize = 2;
-const MIN_VERSION_OFFSET: usize = 3;
-const PACKET_VERSION_OFFSET: usize = 4;
-const PACKET_TYPE_OFFSET: usize = 5;
-const SESSION_ID_OFFSET: usize = 6;
-const SESSION_TIME_OFFSET: usize = 14;
-const FRAME_ID_OFFSET: usize = 18;
-const PLAYER_CAR_INDEX_OFFESET: usize = 20;
-
 #[derive(Debug)]
 enum PacketType {
-	MOTION,
-	SESSION,
-	LAP,
-	EVENT,
-	PARTICIPANT,
-	SETUP,
-	TELEMETRY,
-	CARSTATUS
+	Motion,
+	Session,
+	Lap,
+	Event,
+	Participant,
+	Setup,
+	Telemetry,	
+	CarStatus,
 }
 
+//Design is that events are differentiated by way of a 4 byte array of ascii chars???
+//We have no need to read these as chars so plan to create an instance of these enum vals with the int val of the ascii chars in question 
+//Possible improvement calculate the 32 bit val of concating these bytes together as we could read the data stream as one 32 bit val rather than 4 8 bit vals
+#[derive(Debug)]
 enum EventType { 
-	SSTA,	// Session Started
-	SEND,	// Session Ended
-	FTLP,	// Fastest Lap
-	RTMT,	// Retirement	
-	DRSE,	// DRS Enabled	
-	DRSD, 	// DRS Disabled
-	TMPT,	// Team mate in the pits
-	CHQF,	// The chequered flag has been waved
-	RCWN,	// The race winner is announced 
+	SSTA([u8; 4]),		// Session Started "SSTA" S=83, S=83, T=84, A=65
+	SEND([u8; 4]),		// Session Ended "SEND" S=83, E=69, N=78, D=68
+	FTLP([u8; 4]),		// Fastest Lap "FTLP" F=70, T=84, L=76, P=80
+	RTMT([u8; 4]),		// Retirement "RTMT" R=82, T=84, M=77, T=84
+	DRSE([u8; 4]),		// DRS Enabled "DRSE" D=68, R=82, S=83, E=69
+	DRSD([u8; 4]), 		// DRS Disabled "DRSD" D=68, R=82, S=83, D=68
+	TMPT([u8; 4]),		// Team mate in the pits "TMPT" T=84, M=77, P=80, T=84
+	CHQF([u8; 4]),		// The chequered flag has been waved "CHQF" C=67, H=72, Q=81, F=70
+	RCWN([u8; 4]),		// The race winner is announced "RCWN" R=82, C=67, W=87, N=78
 }
 
+#[derive(Debug)]
 struct Event {
+	header: PacketHeader,
 	event_type: EventType,
-	
+	car_idx: u8,		//The car if this event refers to a car
+	lap_time: f32,		//Lap time if this event is fastest lap
 }
 
 #[derive(Debug)]
@@ -135,36 +128,190 @@ struct Lap	{
     lap_data: [LapData; 20]  // Lap data for all cars on track
 }
 
-union EventDataDetails
-{
-    struct
-    {
-        uint8	vehicleIdx; // Vehicle index of car achieving fastest lap
-        float	lapTime;    // Lap time is in seconds
-    } FastestLap;
 
-    struct
-    {
-        uint8   vehicleIdx; // Vehicle index of car retiring
-    } Retirement;
 
-    struct
-    {
-        uint8   vehicleIdx; // Vehicle index of team mate
-    } TeamMateInPits;
+// This is a list of participants in the race. If the vehicle is controlled by AI, 
+//then the name will be the driver name. If this is a multiplayer game, the names will be the Steam Id on PC, or the LAN name if appropriate.
+//N.B. on Xbox One, the names will always be the driver name, on PS4 the name will be the LAN name if playing a LAN game, otherwise it will be the driver name.
+//The array should be indexed by vehicle index.
 
-    struct
-    {
-        uint8   vehicleIdx; // Vehicle index of the race winner
-    } RaceWinner;
+//Frequency: Every 5 seconds
+//Size: 1104 bytes
+//Version: 1 
+//Can't Derive Debug due to array size
+//		arrays only have std trait implementations for lengths 0..=32
+//	  = note: required because of the requirements on the impl of `std::fmt::Debug` for `[u8; 48]`
+//    = note: required because of the requirements on the impl of `std::fmt::Debug` for `&[u8; 48]`
+//    = note: required for the cast to the object type `dyn std::fmt::Debug`
+struct ParticipantData {
+    ai_controlled: 	u8,         // Whether the vehicle is AI (1) or Human (0) controlled
+    driver_id: 		u8,			// Driver id - see appendix
+    team_id: 		u8,         // Team id - see appendix
+    race_number: 	u8,         // Race number of the car
+    nationality: 	u8,         // Nationality of the driver
+    name: 			[u8; 48],   // Name of participant in UTF-8 format – null terminated Will be truncated with … (U+2026) if too long
+    priv_telemetry: u8,         // The player's UDP setting, 0 = restricted, 1 = public
+}
+
+struct Participants {
+    header: 			PacketHeader,			// Header
+    num_cars_active:	u8,						// Number of active cars in the data – should match number of cars on HUD
+    participant_data:	[ParticipantData; 20],	// Data for all cars
+}
+
+//Car Setups Packet
+//This packet details the car setups for each vehicle in the session. Note that in multiplayer games, other player cars will appear as blank, 
+//you will only be able to see your car setup and AI cars.
+//Frequency: 2 per second
+//Size: 843 bytes
+//Version: 1
+
+struct CarSetupData {
+    front_wing: 			u8,             // Front wing aero
+    rear_wing:				u8,             // Rear wing aero
+    on_throttle: 			u8,             // Differential adjustment on throttle (percentage)
+    off_throttle: 			u8,             // Differential adjustment off throttle (percentage)
+    front_camber: 			f32,            // Front camber angle (suspension geometry)
+    rear_camber: 			f32,            // Rear camber angle (suspension geometry)
+    front_toe: 				f32,            // Front toe angle (suspension geometry)
+    rear_toe: 				f32,            // Rear toe angle (suspension geometry)
+    front_suspension: 		u8,         	// Front suspension
+    rear_suspension:		u8,           	// Rear suspension
+    front_anti_roll_bar: 	u8,         	// Front anti-roll bar
+    rear_anti_roll_bar: 	u8,          	// Front anti-roll bar
+    front_suspension_height:u8,    			// Front ride height
+    rear_suspension_height: u8,     		// Rear ride height
+    brake_pressure: 		u8,            	// Brake pressure (percentage)
+    brake_bias: 			u8,             // Brake bias (percentage)
+    front_tyre_pressure: 	f32,       		// Front tyre pressure (PSI)
+    rear_tyre_pressure: 	f32,         	// Rear tyre pressure (PSI)
+    ballast: 				u8,             // Ballast
+    fuel_load: 				f32,            // Fuel load
+}
+
+struct PacketCarSetupData {
+    header: PacketHeader,
+    car_setups: [CarSetupData; 20],
+}
+
+//---------------Car Status Packet
+//This packet details car statuses for all the cars in the race. It includes values such as the damage readings on the car.
+//Frequency: Rate as specified in menus
+//Size: 1143 bytes
+//Version: 1 
+struct CarStatusData {
+	header: 			PacketHeader,			// Header
+    car_status_data: 	[CarStatus; 20],		// Array of car status'
+}
+
+struct CarStatus {
+    traction_control: 		u8,         // 0 (off) - 2 (high)
+    anti_lock_brakes: 		u8,         // 0 (off) - 1 (on)
+    fuel_mix: 				u8,         // Fuel mix - 0 = lean, 1 = standard, 2 = rich, 3 = max
+    front_brake_bias: 		u8,         // Front brake bias (percentage)
+    pit_limiter_status: 	u8,       	// Pit limiter status - 0 = off, 1 = on
+    fuel_in_tank: 			f32,        // Current fuel mass
+	fuel_capacity: 			f32,        // Fuel capacity
+	fuel_remaining_laps:	f32,       	// Fuel remaining in terms of laps (value on MFD)
+    max_rpm: 				u16,        // Cars max RPM, point of rev limiter
+    idle_rpm:				u16,        // Cars idle RPM
+    max_gears: 				u8,         // Maximum number of gears
+    drs_allowed: 			u8,         // 0 = not allowed, 1 = allowed, -1 = unknown
+    tyres_wear: 			[u8; 4],    // Tyre wear percentage
+    actual_tyre_compound: 	u8,	   		// F1 Modern - 16 = C5, 17 = C4, 18 = C3, 19 = C2, 20 = C1
+   					   						// 7 = inter, 8 = wet
+   					   						// F1 Classic - 9 = dry, 10 = wet
+   					   						// F2 – 11 = super soft, 12 = soft, 13 = medium, 14 = hard
+   					   						// 15 = wet
+	tyre_visual_compound: 	u8,       	// F1 visual (can be different from actual compound)
+   											// 16 = soft, 17 = medium, 18 = hard, 7 = inter, 8 = wet
+   											// F1 Classic – same as above
+   											// F2 – same as above
+    tyres_damage: 			[u8; 4],            	// Tyre damage (percentage)
+    front_left_wing_damage: u8,      		// Front left wing damage (percentage)
+    front_right_wing_damage:u8,     		// Front right wing damage (percentage)
+    rear_wing_damage: 		u8,           	// Rear wing damage (percentage)
+    engine_damage: 			u8,             		// Engine damage (percentage)
+    gear_box_damage: 		u8,            	// Gear box damage (percentage)
+    vehicle_fia_flags: 		i8,	   			// -1 = invalid/unknown, 0 = none, 1 = green
+                                            // 2 = blue, 3 = yellow, 4 = red
+    ers_store_energy: 		f32,           	// ERS energy store in Joules
+    ers_deploy_mode: 		u8,            	// ERS deployment mode, 0 = none, 1 = low, 2 = medium
+   					   						// 3 = high, 4 = overtake, 5 = hotlap
+    ers_harvested_this_lap_mguk: 	f32,  	// ERS energy harvested this lap by MGU-K
+    ers_harvested_this_lap_mguh: 	f32,  	// ERS energy harvested this lap by MGU-H
+    ers_deployed_this_lap: 			f32,    // ERS energy deployed this lap
+}
+
+//-------------Motion Packet
+//The motion packet gives physics data for all the cars being driven. There is additional data for the car being driven with the 
+//goal of being able to drive a motion platform setup.
+//N.B. For the normalised vectors below, to convert to float values divide by 32767.0f – 16-bit signed values are used to pack 
+//the data and on the assumption that direction values are always between -1.0f and 1.0f.
+//Frequency: Rate as specified in menus
+//Size: 1343 bytes
+//Version: 1
+
+struct CarMotion {
+    world_pos_x: f32,			//World Space pos
+    world_pos_y: f32,
+    world_pos_z: f32,
+    world_vel_x: f32,			//World velocity
+    world_vel_y: f32,
+    world_vel_z: f32,
+    world_fwd_dir_x: i16,	 	// World space forward X direction (normalised)
+    world_fwd_dir_y: i16,		// World space forward Y direction (normalised)
+    world_fwd_dir_z: i16,		// World space forward Z direction (normalised)
+    world_right_dir_x: i16,		// World space right X direction (normalised)
+    world_right_dir_y: i16,		// World space right Y direction (normalised)
+    world_right_dir_z: i16,		// World space right Z direction (normalised)
+    lateral_g: f32,
+    longitudinal_g: f32,
+    vertical_g: f32,
+    yaw: f32,					//Radians
+    pitch: f32,					//Radians
+    roll: f32.					//Radians
 };
 
-struct EventData {
-   	header: PacketHeader,               // Header
-	uint8           	m_eventStringCode[4];   // Event string code, see below
-EventDataDetails	m_eventDetails;         // Event details - should be interpreted differently
-// for each type
-};
+struct MotionData {
+    header: PacketHeader,               	// Header
+    car_motion_data: [CarMotion: 20];    	// Data for all cars on track
+
+    //Player car only
+    suspension_pos: 	[f32; 4],
+    suspension_vel: 	[f32; 4],
+    suspension_acc:		[f32; 4],
+    wheel_speed: 		[f32; 4],
+    wheel_slip:			[f32; 4],
+    local_vel_x:		f32,		//Local space
+    local_vel_y:		f32,
+    local_vel_z:		f32,
+    angular_vel_x:		f32,
+    angular_vel_y:		f32,
+    angular_vel_z:		f32,
+    angular_acc_x:		f32,
+    angular_acc_y:		f32,
+    angular_acc_z:		f32,
+    front_wheels_angle: f32, //Radians
+}
+
+
+
+
+const BUFFER_SIZE: usize = 1347;						//Max packet size to spec
+const DEFAULT_SOCKET_BINDING: &str = "0.0.0.0:20777";	//20777 default on ps4
+
+//Header part offsets
+const PACKET_FORMAT_OFFSET: usize = 0;
+const MAJ_VERSION_OFFSET: usize = 2;
+const MIN_VERSION_OFFSET: usize = 3;
+const PACKET_VERSION_OFFSET: usize = 4;
+const PACKET_TYPE_OFFSET: usize = 5;
+const SESSION_ID_OFFSET: usize = 6;
+const SESSION_TIME_OFFSET: usize = 14;
+const FRAME_ID_OFFSET: usize = 18;
+const PLAYER_CAR_INDEX_OFFESET: usize = 20;
+
 
 fn main() {
 	let mut buf = [0u8; BUFFER_SIZE]; 	
@@ -178,9 +325,19 @@ fn main() {
     	if bytes_recevied == 0  {
     		continue;
     	}
-    	let header: PacketHeader = parse_header(&buf, bytes_recevied).unwrap(); 
+    	let header: PacketHeader = match parse_header(&buf, bytes_recevied) {
+    		Some(p) => p,
+    		None => continue,
+    	};
     	match header.packet_type {
-
+ 			PacketType::Motion => (),
+			PacketType::Session => (),
+			PacketType::Lap => (),
+			PacketType::Event => (),
+			PacketType::Participant => (), 
+			PacketType::Setup => (),
+			PacketType::Telemetry => (),
+			PacketType::CarStatus => (),   		
     	}
     }
 }
@@ -196,14 +353,14 @@ fn parse_header(buf: &[u8; BUFFER_SIZE], len: usize) -> Option<PacketHeader> {
 
 fn get_packet_type(parsed_byte: u8) -> Option<PacketType> {
 	match parsed_byte {
-		0 => Some(PacketType::MOTION),
-		1 => Some(PacketType::SESSION),
-		2 => Some(PacketType::LAP),
-		3 => Some(PacketType::EVENT),
-		4 => Some(PacketType::PARTICIPANT),
-		5 => Some(PacketType::SETUP),
-		6 => Some(PacketType::TELEMETRY),
-		7 => Some(PacketType::CARSTATUS),
+		0 => Some(PacketType::Motion),
+		1 => Some(PacketType::Session),
+		2 => Some(PacketType::Lap),
+		3 => Some(PacketType::Event),
+		4 => Some(PacketType::Participant),
+		5 => Some(PacketType::Setup),
+		6 => Some(PacketType::Telemetry),
+		7 => Some(PacketType::CarStatus),
 		_ => None
 	}
 }
