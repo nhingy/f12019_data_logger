@@ -52,7 +52,7 @@ const EVENT_SIZE: usize = 43; // Might not be able to use this as event packet c
 const PARTICIPANTS_SIZE: usize = 1104;
 const CARSETUPS_SIZE: usize = 843;
 const TELEMETY_SIZE: usize = MAX_PACKET_SIZE;
-const CARSTATUS_SIZE: usize = 1143;
+const STATUS_SIZE: usize = 1143;
 
 //Sub type sizes
 const MARSHAL_ZONE_SIZE: usize = 5;
@@ -61,6 +61,7 @@ const CAR_LAP_SIZE: usize = 41;
 const PARTICIPANT_SIZE: usize = 54;
 const CAR_SETUP_SIZE: usize = 41;
 const CAR_TELEMETRY_SIZE: usize = 66;
+const CAR_STATUS_SIZE: usize = 56;
 
 //Nums of elems
 const NUM_MARSHAL_ZONES: usize = 21;
@@ -73,7 +74,7 @@ fn main() {
     let mut lap_data: 			VecDeque<Lap> = VecDeque::with_capacity(200);
     let mut event_data:			VecDeque<Event> = VecDeque::with_capacity(200);
     let mut setup_data: 		VecDeque<CarSetups> = VecDeque::with_capacity(200);
-    let mut car_status_data: 	VecDeque<CarStatus> = VecDeque::with_capacity(200);
+    let mut car_status_data: 	VecDeque<CarStatusData> = VecDeque::with_capacity(200);
     let mut participant_data: 	VecDeque<Participants> = VecDeque::with_capacity(200);
     let mut telemetry_data: 	VecDeque<Telemetry> = VecDeque::with_capacity(200);	
 	
@@ -167,16 +168,16 @@ fn parse_motion_data(buf: &[u8; MAX_PACKET_SIZE], header: PacketHeader, num_byte
 	}
 	let mut car_data = [CarMotion::default(); NUM_CARS];
 	parse_car_motion(&buf, &mut car_data, NUM_CARS);
-	let mut sus_pos 	= [0.0f32; 4];
-	let mut sus_vel 	= [0.0f32; 4];
-	let mut sus_acc 	= [0.0f32; 4];
-	let mut wheel_spd 	= [0.0f32; 4];
-	let mut wheel_slp 	= [0.0f32; 4];
-	parse_wheel_arrays(&mut sus_pos, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+16], NUM_WHEELS);
-	parse_wheel_arrays(&mut sus_vel, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+16..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+32], NUM_WHEELS);
-	parse_wheel_arrays(&mut sus_acc, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+48..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+64], NUM_WHEELS);
-	parse_wheel_arrays(&mut wheel_spd, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+80..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+96], NUM_WHEELS);
-	parse_wheel_arrays(&mut wheel_slp, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+112..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+128], NUM_WHEELS);
+	let mut sus_pos 	= [0.0f32; NUM_WHEELS];
+	let mut sus_vel 	= [0.0f32; NUM_WHEELS];
+	let mut sus_acc 	= [0.0f32; NUM_WHEELS];
+	let mut wheel_spd 	= [0.0f32; NUM_WHEELS];
+	let mut wheel_slp 	= [0.0f32; NUM_WHEELS];
+	parse_wheel_array_f32(&mut sus_pos, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+16], NUM_WHEELS);
+	parse_wheel_array_f32(&mut sus_vel, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+16..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+32], NUM_WHEELS);
+	parse_wheel_array_f32(&mut sus_acc, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+48..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+64], NUM_WHEELS);
+	parse_wheel_array_f32(&mut wheel_spd, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+80..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+96], NUM_WHEELS);
+	parse_wheel_array_f32(&mut wheel_slp, &buf[HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+112..HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+128], NUM_WHEELS);
 	let mut offset = HEADER_SIZE+(CAR_MOTION_SIZE*NUM_CARS)+128;
 	return Some ( MotionData {
 				header,
@@ -225,33 +226,33 @@ fn parse_car_motion(buf: &[u8; MAX_PACKET_SIZE], car_data: &mut [CarMotion; 20],
 
 }
 
-fn parse_wheel_arrays(array_to_fill: &mut [f32; 4], bytes: &[u8], count: usize) {
+fn parse_wheel_array_f32(array_to_fill: &mut [f32; NUM_WHEELS], bytes: &[u8], count: usize) {
 	let mut index = NUM_WHEELS - count;
 	array_to_fill[index] = bytes.read_with::<f32>(&mut (index * 4), LE).unwrap(); // *4 4 bytes per f32
 	if count <= 0 {
 		return;
 	} else {
-		parse_wheel_arrays(array_to_fill, bytes, count-1);
+		parse_wheel_array_f32(array_to_fill, bytes, count-1);
 	}
 }
 
-fn parse_temps(array_to_fill: &mut [u16; 4], bytes: &[u8], count: usize) {
+fn parse_wheel_array_u16(array_to_fill: &mut [u16; NUM_WHEELS], bytes: &[u8], count: usize) {
 	let mut index = NUM_WHEELS - count;
 	array_to_fill[index] = bytes.read_with::<u16>(&mut (index * 2), LE).unwrap(); // *2 2 bytes per f32
 	if count <= 0 {
 		return;
 	} else {
-		parse_temps(array_to_fill, bytes, count-1);
+		parse_wheel_array_u16(array_to_fill, bytes, count-1);
 	}
 }
 
-fn parse_contact(array_to_fill: &mut [u8; 4], bytes: &[u8], count: usize) {
+fn parse_wheel_array_u8(array_to_fill: &mut [u8; NUM_WHEELS], bytes: &[u8], count: usize) {
 	let mut index = NUM_WHEELS - count;
 	array_to_fill[index] = bytes.read_with::<u8>(&mut index, LE).unwrap();
 	if count <= 0 {
 		return;
 	} else {
-		parse_contact(array_to_fill, bytes, count-1);
+		parse_wheel_array_u8(array_to_fill, bytes, count-1);
 	}
 }
 
@@ -541,11 +542,11 @@ fn parse_car_telemetry(car_telemetry: &mut [CarTelemetry; NUM_CARS], bytes: &[u8
 	let mut tyre_ic_temps 	= [0u16; NUM_WHEELS];
 	let mut tyre_pres 		= [0f32; NUM_WHEELS];
 	let mut tyre_contacts 	= [0u8; NUM_WHEELS];
-	parse_temps(&mut brake_temps, &bytes[offset+20..], NUM_WHEELS);
-	parse_temps(&mut tyre_s_temps, &bytes[offset+28..], NUM_WHEELS);
-	parse_temps(&mut tyre_ic_temps, &bytes[offset+36..], NUM_WHEELS);
-	parse_wheel_arrays(&mut tyre_pres, &bytes[offset+46..], NUM_WHEELS);
-	parse_contact(&mut tyre_contacts, &bytes[offset+62..], NUM_WHEELS);
+	parse_wheel_array_u16(&mut brake_temps, &bytes[offset+20..], NUM_WHEELS);
+	parse_wheel_array_u16(&mut tyre_s_temps, &bytes[offset+28..], NUM_WHEELS);
+	parse_wheel_array_u16(&mut tyre_ic_temps, &bytes[offset+36..], NUM_WHEELS);
+	parse_wheel_array_f32(&mut tyre_pres, &bytes[offset+46..], NUM_WHEELS);
+	parse_wheel_array_u8(&mut tyre_contacts, &bytes[offset+62..], NUM_WHEELS);
 	let telemetry =			 
 		CarTelemetry {
 					car_speed: 			bytes.read_with::<u16>(&mut (offset), LE).unwrap(),			
@@ -572,8 +573,63 @@ fn parse_car_telemetry(car_telemetry: &mut [CarTelemetry; NUM_CARS], bytes: &[u8
 	}
 }
 
-fn parse_car_status_data(buf: &[u8; MAX_PACKET_SIZE], header: PacketHeader, num_bytes: usize) -> Option<CarStatus> {
-	None
+fn parse_car_status_data(buf: &[u8; MAX_PACKET_SIZE], header: PacketHeader, num_bytes: usize) -> Option<CarStatusData> {
+	if num_bytes != STATUS_SIZE {
+		return None;
+	} 
+	let mut status_data = [CarStatus::default(); NUM_CARS];
+	parse_car_status(&mut status_data, &buf[HEADER_SIZE..], NUM_CARS);
+	return Some(CarStatusData{
+		header, 
+		car_status_data: status_data,
+	});
 }
+
+fn parse_car_status(status_data: &mut [CarStatus; NUM_CARS], bytes: &[u8], count: usize) {
+	let index = NUM_CARS - count;
+	let mut offset = index * CAR_STATUS_SIZE;
+	let mut tyre_wear 	= [0u8; NUM_WHEELS];
+	let mut tyre_damage = [0u8; NUM_WHEELS];
+	parse_wheel_array_u8(&mut tyre_wear, &bytes[offset+23..], NUM_WHEELS);
+	parse_wheel_array_u8(&mut tyre_damage, &bytes[offset+29..], NUM_WHEELS);
+	let car_status_data = 
+		CarStatus {
+			    traction_control: 	bytes.read_with::<u8>(&mut (offset), LE).unwrap(),		
+			    anti_lock_brakes: 	bytes.read_with::<u8>(&mut (offset+1), LE).unwrap(),		
+			    fuel_mix: 			bytes.read_with::<u8>(&mut (offset+2), LE).unwrap(),	
+			    front_brake_bias: 	bytes.read_with::<u8>(&mut (offset+3), LE).unwrap(),	
+			    pit_limiter_status: bytes.read_with::<u8>(&mut (offset+4), LE).unwrap(),	
+			    fuel_in_tank: 		bytes.read_with::<f32>(&mut (offset+5), LE).unwrap(),	
+				fuel_capacity: 		bytes.read_with::<f32>(&mut (offset+9), LE).unwrap(),	
+				fuel_remaining_laps:bytes.read_with::<f32>(&mut (offset+13), LE).unwrap(),	
+			    max_rpm: 			bytes.read_with::<u16>(&mut (offset+17), LE).unwrap(),	
+			    idle_rpm:			bytes.read_with::<u16>(&mut (offset+19), LE).unwrap(),	
+			    max_gears: 			bytes.read_with::<u8>(&mut (offset+21), LE).unwrap(),	
+			    drs_allowed: 		bytes.read_with::<u8>(&mut (offset+22), LE).unwrap(),	
+			    tyres_wear: 			tyre_wear,	
+			    actual_tyre_compound: 	bytes.read_with::<u8>(&mut (offset+27), LE).unwrap(),	
+				tyre_visual_compound: 	bytes.read_with::<u8>(&mut (offset+28), LE).unwrap(),      										
+			    tyres_damage: 			tyre_damage,
+			    front_left_wing_damage: bytes.read_with::<u8>(&mut (offset+33), LE).unwrap(),
+			    front_right_wing_damage:bytes.read_with::<u8>(&mut (offset+34), LE).unwrap(),
+			    rear_wing_damage: 		bytes.read_with::<u8>(&mut (offset+35), LE).unwrap(),
+			    engine_damage: 			bytes.read_with::<u8>(&mut (offset+36), LE).unwrap(),
+			    gear_box_damage: 		bytes.read_with::<u8>(&mut (offset+37), LE).unwrap(),
+			    vehicle_fia_flags: 		bytes.read_with::<i8>(&mut (offset+38), LE).unwrap(),                   
+			    ers_store_energy: 		bytes.read_with::<f32>(&mut (offset+39), LE).unwrap(),
+			    ers_deploy_mode: 		bytes.read_with::<u8>(&mut (offset+43), LE).unwrap(),			
+			    ers_harvested_this_lap_mguk:	bytes.read_with::<f32>(&mut (offset+44), LE).unwrap(),
+			    ers_harvested_this_lap_mguh:	bytes.read_with::<f32>(&mut (offset+48), LE).unwrap(),
+			    ers_deployed_this_lap: 			bytes.read_with::<f32>(&mut (offset+52), LE).unwrap(),
+		};
+	status_data[index] = car_status_data;
+	if count <= 0 {
+		return;
+	} else {
+		parse_car_status(status_data, bytes, count-1);
+	}
+}
+
+
 	
 

@@ -246,7 +246,8 @@ pub struct CarStatusData {
     pub car_status_data: 	[CarStatus; 20],		// Array of car status'
 }
 
-pub struct CarStatus {
+#[derive(Default, Clone, Copy)] 
+pub struct CarStatus {                      //56 bytes
     pub traction_control: 		u8,         // 0 (off) - 2 (high)
     pub anti_lock_brakes: 		u8,         // 0 (off) - 1 (on)
     pub fuel_mix: 				u8,         // Fuel mix - 0 = lean, 1 = standard, 2 = rich, 3 = max
