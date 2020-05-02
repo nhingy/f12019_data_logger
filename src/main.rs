@@ -1,6 +1,7 @@
 use std::net::UdpSocket;
 use byte::*;
 use std::collections::VecDeque;
+use std::collections::HashMap;
 
 /*
 @TODO convert name array to utf-8
@@ -26,6 +27,7 @@ use f1_2019_net::CarTelemetry;
 use f1_2019_net::EventType;
 use f1_2019_net::Event;
 use f1_2019_net::MarshalZone;
+
 
 const MAX_PACKET_SIZE: usize = 1347;					//Max packet size to spec
 const DEFAULT_SOCKET_BINDING: &str = "0.0.0.0:20777";	//20777 default on ps4
@@ -67,18 +69,35 @@ const CAR_STATUS_SIZE: usize = 56;
 const NUM_MARSHAL_ZONES: usize = 21;
 const NUM_CARS: usize = 20;
 const NUM_WHEELS: usize = 4;
+const NUM_TEAMS: usize = 53;
+const NUM_TRACKS: usize = 25;
+const NUM_DRIVERS: usize = 77;
+const NUM_COUNTRIES: usize = 86;
+const NUM_BUTTONS: usize = 15;
 
 fn main() {
-    let mut motion_data: 		VecDeque<MotionData> = VecDeque::with_capacity(200);
-    let mut session_data: 		VecDeque<SessionData> = VecDeque::with_capacity(200);
-    let mut lap_data: 			VecDeque<Lap> = VecDeque::with_capacity(200);
-    let mut event_data:			VecDeque<Event> = VecDeque::with_capacity(200);
-    let mut setup_data: 		VecDeque<CarSetups> = VecDeque::with_capacity(200);
-    let mut car_status_data: 	VecDeque<CarStatusData> = VecDeque::with_capacity(200);
-    let mut participant_data: 	VecDeque<Participants> = VecDeque::with_capacity(200);
-    let mut telemetry_data: 	VecDeque<Telemetry> = VecDeque::with_capacity(200);	
+    let mut motion_data: VecDeque<MotionData> 			= VecDeque::with_capacity(32);		// update spd 20-60hz
+    let mut session_data: VecDeque<SessionData> 		= VecDeque::with_capacity(2);		// every 2 seconds
+    let mut lap_data: VecDeque<Lap> 					= VecDeque::with_capacity(32);		// update spd 20-60hz
+    let mut event_data:	VecDeque<Event> 				= VecDeque::with_capacity(4);		// as events happen
+    let mut setup_data:	VecDeque<CarSetups> 			= VecDeque::with_capacity(2);		// every 2 seconds	
+    let mut car_status_data: VecDeque<CarStatusData> 	= VecDeque::with_capacity(32); 		// update spd 20-60hz
+    let mut participant_data: VecDeque<Participants> 	= VecDeque::with_capacity(2); 		// every 5 seconds
+    let mut telemetry_data: VecDeque<Telemetry> 		= VecDeque::with_capacity(32);		// update spd
+
+    let mut teams: HashMap<usize, &str> 	  = HashMap::with_capacity(NUM_TEAMS);
+    let mut drivers: HashMap<usize, &str> 	  = HashMap::with_capacity(NUM_DRIVERS);
+    let mut tracks: HashMap<usize, &str> 	  = HashMap::with_capacity(NUM_TRACKS);
+    let mut countries: HashMap<usize, &str>   = HashMap::with_capacity(NUM_COUNTRIES);
+    let mut button_press: HashMap<&str, &str> = HashMap::with_capacity(NUM_BUTTONS);
+    
+    f1_2019_net::init_teams(&mut teams);
+    f1_2019_net::init_tracks(&mut tracks);
+    f1_2019_net::init_drivers(&mut drivers);
+    f1_2019_net::init_countries(&mut countries);
+    f1_2019_net::init_button_flags(&mut button_press);
 	
-	let mut header: 			PacketHeader = Default::default(); 
+	let mut header: PacketHeader = Default::default(); 
 	let mut buf = [0u8; MAX_PACKET_SIZE]; 
     
     let socket = UdpSocket::bind(DEFAULT_SOCKET_BINDING).expect("failed to bind to socket");

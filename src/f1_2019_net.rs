@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::fmt;
+
 #[derive(Debug, Clone, Copy)]
 pub enum PacketType {
     Motion,
@@ -8,11 +11,27 @@ pub enum PacketType {
     Setup,
     Telemetry,  
     CarStatus,
-    InvalidPacket,
+    InvalidPacket, 
 }
 
 impl Default for PacketType {
-    fn default() -> Self {PacketType::InvalidPacket}
+    fn default() -> Self {PacketType::InvalidPacket} //ok to use as default and error state as byte can't be > 7
+}
+
+impl PacketType {
+    pub fn getName(&self, event_type: PacketType) -> &str {
+        match event_type {
+            Motion      => return &"motion packet",
+            Session     => return &"session packet", 
+            Lap         => return &"lap packet",
+            Event       => return &"event packet",
+            Participant => return &"participant packet",
+            Setup       => return &"setup packet",
+            Telemetry   => return &"telemetry packet",
+            CarStatus   => return &"car status packet",
+            InvalidPacket => return &"invalid packet",   
+        }
+    }
 }
 
 //Design is that events are differentiated by way of a 4 byte array of ascii chars???
@@ -37,6 +56,10 @@ pub struct Event {
 	pub event_type: EventType,
 	pub car_idx: u8,		//The car if this event refers to a car
 	pub lap_time: f32,		//Lap time if this event is fastest lap
+}
+
+impl Event {
+    
 }
 
 //
@@ -337,3 +360,289 @@ pub struct MotionData {
     pub angular_acc_z:		f32,
     pub front_wheels_angle: f32, //Radians
 }
+
+pub fn init_teams(map: &mut HashMap<usize, &str>) {
+    map.insert(0, "Mercedes");
+    map.insert(1, "Ferrari");
+    map.insert(2, "Red Bull Racing");
+    map.insert(3, "Williams");
+    map.insert(4, "Racing Point");
+    map.insert(5, "Renault");
+    map.insert(6, "Toro Rosso");
+    map.insert(7, "Haas");
+    map.insert(8, "McLaren");
+    map.insert(9, "Alfa Romeo");
+    map.insert(10, "McLaren 1988");
+    map.insert(11, "McLaren 1991");
+    map.insert(12, "Williams 1992");
+    map.insert(13, "Ferrari 1995");
+    map.insert(14, "Williams 1996");
+    map.insert(15, "McLaren 1998");
+    map.insert(16, "Ferrari 2002");
+    map.insert(17, "Ferrari 2004");
+    map.insert(18, "Renault 2006");
+    map.insert(19, "Ferrari 2007");
+    map.insert(21, "Red Bull 2010");
+    map.insert(22, "Ferrari 1976");
+    map.insert(23, "ART Grand Prix");
+    map.insert(24, "Campos Vexatec Racing");
+    map.insert(25, "Carlin");
+    map.insert(26, "Charouz Racing System");
+    map.insert(27, "DAMS");
+    map.insert(28, "Russian Time");
+    map.insert(29, "MP Motorsport");
+    map.insert(30, "Pertamina");
+    map.insert(31, "McLaren 1990");
+    map.insert(32, "Trident");
+    map.insert(33, "BWT Arden");
+    map.insert(34, "McLaren 1976");
+    map.insert(35, "Lotus 1972");
+    map.insert(36, "Ferrari 1979");
+    map.insert(37, "McLaren 1982");
+    map.insert(38, "Williams 2003");
+    map.insert(39, "Brawn 2009");
+    map.insert(40, "Lotus 1978");
+    map.insert(42, "Art GP ’19");
+    map.insert(43, "Campos ’19");
+    map.insert(44, "Carlin ’19");
+    map.insert(45, "Sauber Junior Charouz ’19");
+    map.insert(46, "Dams ’19");
+    map.insert(47, "Uni-Virtuosi ‘19");
+    map.insert(48, "MP Motorsport ‘19");
+    map.insert(49, "Prema ’19");
+    map.insert(50, "Trident ’19");
+    map.insert(51, "Arden ’19");
+    map.insert(63, "Ferrari 1990");
+    map.insert(64, "McLaren 2010");
+    map.insert(65, "Ferrari 2010");
+}   
+
+pub fn init_drivers(map: &mut HashMap<usize, &str>) {
+    map.insert(0,  "Carlos Sainz");
+    map.insert(37, "Peter Belousov");
+    map.insert(1,  "Daniil Kvyat");
+    map.insert(38, "Klimek Michalski");
+    map.insert(70, "Rashid Nair");
+    map.insert(2,  "Daniel Ricciardo");
+    map.insert(39, "Santiago Moreno");
+    map.insert(71, "Jack Tremblay");
+    map.insert(6,  "Kimi Räikkönen");
+    map.insert(40, "Benjamin Coppens");
+    map.insert(74, "Antonio Giovinazzi");
+    map.insert(7,  "Lewis Hamilton");
+    map.insert(41, "Noah Visser");
+    map.insert(75, "Robert Kubica");
+    map.insert(9,  "Max Verstappen");
+    map.insert(42, "Gert Waldmuller");
+    map.insert(78, "Nobuharu Matsushita");
+    map.insert(10, "Nico Hulkenburg");
+    map.insert(43, "Julian Quesada");
+    map.insert(79, "Nikita Mazepin");
+    map.insert(11, "Kevin Magnussen");
+    map.insert(44, "Daniel Jones");
+    map.insert(80, "Guanya Zhou");
+    map.insert(12, "Romain Grosjean");
+    map.insert(45, "Artem Markelov");
+    map.insert(81, "Mick Schumacher");
+    map.insert(13, "Sebastian Vettel");
+    map.insert(46, "Tadasuke Makino");
+    map.insert(82, "Callum Ilott");
+    map.insert(14, "Sergio Perez");
+    map.insert(47, "Sean Gelael");
+    map.insert(83, "Juan Manuel Correa");
+    map.insert(15, "Valtteri Bottas");
+    map.insert(48, "Nyck De Vries");
+    map.insert(84, "Jordan King");
+    map.insert(19, "Lance Stroll");
+    map.insert(49, "Jack Aitken");
+    map.insert(85, "Mahaveer Raghunathan");
+    map.insert(20, "Arron Barnes");
+    map.insert(50, "George Russell");
+    map.insert(86, "Tatiana Calderon");
+    map.insert(21, "Martin Giles");
+    map.insert(51, "Maximilian Günther");
+    map.insert(87, "Anthoine Hubert");
+    map.insert(22, "Alex Murray");
+    map.insert(52, "Nirei Fukuzumi");
+    map.insert(88, "Guiliano Alesi");
+    map.insert(23, "Lucas Roth");
+    map.insert(53, "Luca Ghiotto");
+    map.insert(89, "Ralph Boschung");
+    map.insert(24, "Igor Correia");
+    map.insert(54, "Lando Norris");
+    map.insert(25, "Sophie Levasseur");
+    map.insert(55, "Sérgio Sette Câmara");
+    map.insert(26, "Jonas Schiffer");
+    map.insert(56, "Louis Delétraz");
+    map.insert(27, "Alain Forest");
+    map.insert(57, "Antonio Fuoco");
+    map.insert(28, "Jay Letourneau");
+    map.insert(58, "Charles Leclerc");
+    map.insert(29, "Esto Saari");
+    map.insert(59, "Pierre Gasly");
+    map.insert(30, "Yasar Atiyeh");
+    map.insert(62, "Alexander Albon");
+    map.insert(31, "Callisto Calabresi");
+    map.insert(63, "Nicholas Latifi");
+    map.insert(32, "Naota Izum");
+    map.insert(64, "Dorian Boccolacci");
+    map.insert(33, "Howard Clarke");
+    map.insert(65, "Niko Kari");
+    map.insert(34, "Wilheim Kaufmann");
+    map.insert(66, "Roberto Merhi");
+    map.insert(35, "Marie Laursen");
+    map.insert(67, "Arjun Maini");
+    map.insert(36, "Flavio Nieves");
+    map.insert(68, "Alessio Lorandi"); 
+    map.insert(69, "Ruben Meijer");
+}
+
+pub fn init_tracks(map: &mut HashMap<usize, &str>) {
+    map.insert(0 , "Melbourne");
+    map.insert(1 , "Paul Ricard");
+    map.insert(2 , "Shanghai");
+    map.insert(3 , "Sakhir Bahrain");
+    map.insert(4 , "Catalunya");
+    map.insert(5 , "Monaco");
+    map.insert(6 , "Montreal");
+    map.insert(7 , "Silverstone");
+    map.insert(8 , "Hockenheim");
+    map.insert(9 , "Hungaroring");
+    map.insert(10, "Spa");
+    map.insert(11, "Monza");
+    map.insert(12, "Singapore");
+    map.insert(13, "Suzuka");
+    map.insert(14, "Abu Dhabi");
+    map.insert(15, "Texas");
+    map.insert(16, "Brazil");
+    map.insert(17, "Austria");
+    map.insert(18, "Sochi");
+    map.insert(19, "Mexico");
+    map.insert(20, "Baku Azerbaijan");
+    map.insert(21, "Sakhir Short");
+    map.insert(22, "Silverstone Short");
+    map.insert(23, "Texas Short");
+    map.insert(24, "Suzuka Short");
+}
+
+pub fn init_countries(map: &mut HashMap<usize, &str>) { 
+    map.insert(1 ,  "American");
+    map.insert(31,  "Greek");
+    map.insert(61,  "Panamanian");
+    map.insert(2 ,  "Argentinean");
+    map.insert(32,  "Guatemalan");
+    map.insert(62,  "Paraguayan");
+    map.insert(3 ,  "Australian");
+    map.insert(33,  "Honduran");
+    map.insert(63,  "Peruvian");
+    map.insert(4 ,  "Austrian");
+    map.insert(34,  "Hong Konger");
+    map.insert(64,  "Polish");
+    map.insert(5 ,  "Azerbaijani");
+    map.insert(35,  "Hungarian");
+    map.insert(65,  "Portuguese");
+    map.insert(6 ,  "Bahraini");
+    map.insert(36,  "Icelander");
+    map.insert(66,  "Qatari");
+    map.insert(7 ,  "Belgian");
+    map.insert(37,  "Indian");
+    map.insert(67,  "Romanian");
+    map.insert(8 ,  "Bolivian");
+    map.insert(38,  "Indonesian");
+    map.insert(68,  "Russian");
+    map.insert(9 ,  "Brazilian");
+    map.insert(39,  "Irish");
+    map.insert(69,  "Salvadoran");
+    map.insert(10,  "British");
+    map.insert(40,  "Israeli");
+    map.insert(70,  "Saudi");
+    map.insert(11,  "Bulgarian");
+    map.insert(41,  "Italian");
+    map.insert(71,  "Scottish");
+    map.insert(12,  "Cameroonian");
+    map.insert(42,  "Jamaican");
+    map.insert(72,  "Serbian");
+    map.insert(13,  "Canadian");
+    map.insert(43,  "Japanese");
+    map.insert(73,  "Singaporean");
+    map.insert(14,  "Chilean");
+    map.insert(44,  "Jordanian");
+    map.insert(74,  "Slovakian");
+    map.insert(15,  "Chinese");
+    map.insert(45,  "Kuwaiti");
+    map.insert(75,  "Slovenian");
+    map.insert(16,  "Colombian");
+    map.insert(46,  "Latvian");
+    map.insert(76,  "South Korean");
+    map.insert(17,  "Costa Rican");
+    map.insert(47,  "Lebanese");
+    map.insert(77,  "South African");
+    map.insert(18,  "Croatian");
+    map.insert(48,  "Lithuanian");
+    map.insert(78,  "Spanish");
+    map.insert(19,  "Cypriot");
+    map.insert(49,  "Luxembourger");
+    map.insert(79,  "Swedish");
+    map.insert(20,  "Czech");
+    map.insert(50,  "Malaysian");
+    map.insert(80,  "Swiss");
+    map.insert(21,  "Danish");
+    map.insert(51,  "Maltese");
+    map.insert(81,  "Thai");
+    map.insert(22,  "Dutch");
+    map.insert(52,  "Mexican");
+    map.insert(82,  "Turkish");
+    map.insert(23,  "Ecuadorian");
+    map.insert(53,  "Monegasque");
+    map.insert(83,  "Uruguayan");
+    map.insert(24,  "English");
+    map.insert(54,  "New Zealander");
+    map.insert(84,  "Ukrainian");
+    map.insert(25,  "Emirian");
+    map.insert(55,  "Nicaraguan");
+    map.insert(85,  "Venezuelan");
+    map.insert(26,  "Estonian");
+    map.insert(56,  "North Korean");
+    map.insert(86,  "Welsh");
+    map.insert(27,  "Finnish");
+    map.insert(57,  "Northern Irish");
+    map.insert(28,  "French");
+    map.insert(58,  "Norwegian");
+    map.insert(29,  "German");
+    map.insert(59,  "Omani");
+    map.insert(30,  "Ghanaian");
+    map.insert(60,  "Pakistani");
+}
+
+pub fn init_surfaces(map: &mut HashMap<usize, &str>) {
+    map.insert(0 , "Tarmac");
+    map.insert(1 , "Rumble strip");
+    map.insert(2 , "Concrete");
+    map.insert(3 , "Rock");
+    map.insert(4 , "Gravel");
+    map.insert(5 , "Mud");
+    map.insert(6 , "Sand");
+    map.insert(7 , "Grass");
+    map.insert(8 , "Water");
+    map.insert(9 , "Cobblestone");
+    map.insert(10, "Metal"); 
+    map.insert(11, "Ridged");
+}
+
+pub fn init_button_flags(map: &mut HashMap<&str, &str>) { //buttons being pressed by player
+    map.insert("0x0001",  "Cross or A");
+    map.insert("0x0002",  "Triangle or Y");
+    map.insert("0x0004",  "Circle or B");
+    map.insert("0x0008",  "Square or X");
+    map.insert("0x0010",  "D-pad Left");
+    map.insert("0x0020",  "D-pad Right");
+    map.insert("0x0040",  "D-pad Up");
+    map.insert("0x0080",  "D-pad Down");
+    map.insert("0x0100",  "Options or Menu");
+    map.insert("0x0200",  "L1 or LB");
+    map.insert("0x0400",  "R1 or RB");
+    map.insert("0x0800",  "L2 or LT");
+    map.insert("0x1000",  "R2 or RT");
+    map.insert("0x2000",  "Left Stick Click");
+    map.insert("0x4000",  "Right Stick Click");
+}  
